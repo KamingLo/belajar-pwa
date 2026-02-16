@@ -1,65 +1,233 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { jsPDF } from "jspdf";
+
+interface Item {
+  qty: number;
+  nama: string;
+  harga: number;
+  total: number;
+}
+
+export default function InvoicePage() {
+  // State untuk Metadata (Sekarang tanpa useEffect)
+  const [kepada, setKepada] = useState("");
+  const [pemberi, setPemberi] = useState("Kaming");
+  const [tanggal, setTanggal] = useState("");
+  const [penjelasan, setPenjelasan] = useState("");
+
+  // State untuk Input Item Baru
+  const [inputQty, setInputQty] = useState<number | "">("");
+  const [inputNama, setInputNama] = useState("");
+  const [inputHarga, setInputHarga] = useState<number | "">("");
+
+  // State untuk Daftar Item
+  const [items, setItems] = useState<Item[]>([]);
+
+  const formatRupiah = (number: number) => {
+    return "Rp " + number.toLocaleString("id-ID");
+  };
+
+  const addItem = () => {
+    if (!inputQty || !inputNama || !inputHarga) return;
+    const total = Number(inputQty) * Number(inputHarga);
+    setItems([...items, { qty: Number(inputQty), nama: inputNama, harga: Number(inputHarga), total }]);
+    setInputQty("");
+    setInputNama("");
+    setInputHarga("");
+  };
+
+  const removeItem = (index: number) => {
+    if (confirm("Yakin mau hapus item ini?")) {
+      setItems(items.filter((_, i) => i !== index));
+    }
+  };
+
+  const grandTotal = items.reduce((acc, item) => acc + item.total, 0);
+
+  // FUNGSI UTAMA DOWNLOAD
+  const downloadPDF = () => {
+    // 1. Fungsi Helper Internal untuk Generate No Invoice (Impure Logic)
+    const generateInvoiceID = () => {
+      const d = new Date();
+      const datePart = `${d.getFullYear()}${(d.getMonth() + 1).toString().padStart(2, "0")}${d.getDate().toString().padStart(2, "0")}`;
+      const randomPart = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+      return `INV-${datePart}-${randomPart}`;
+    };
+
+    const doc = new jsPDF();
+    const invoiceNumber = generateInvoiceID(); // Dipanggil hanya saat klik
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    // --- LOGIKA DRAW PDF ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text(pemberi.toUpperCase(), 20, y);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`No Invoice: ${invoiceNumber}`, pageWidth - 20, y, { align: "right" });
+
+    y += 10;
+    doc.setDrawColor(180);
+    doc.line(20, y, pageWidth - 20, y);
+
+    y += 12;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Kepada:", 20, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Yth. ${kepada || "-"}`, 20, y);
+    y += 6;
+    doc.text(`Tanggal: ${tanggal || "-"}`, 20, y);
+
+    y += 15;
+    doc.setFont("helvetica", "bold");
+    doc.text("Jumlah", 20, y);
+    doc.text("Deskripsi", 40, y);
+    doc.text("Harga", 140, y, { align: "right" });
+    doc.text("Total", 190, y, { align: "right" });
+    y += 4;
+    doc.line(20, y, pageWidth - 20, y);
+
+    doc.setFont("helvetica", "normal");
+    y += 8;
+    items.forEach((item) => {
+      doc.text(String(item.qty), 20, y);
+      doc.text(item.nama, 40, y);
+      doc.text(formatRupiah(item.harga), 140, y, { align: "right" });
+      doc.text(formatRupiah(item.total), 190, y, { align: "right" });
+      y += 8;
+    });
+
+    y += 4;
+    doc.line(120, y, pageWidth - 20, y);
+    y += 10;
+    doc.setFont("helvetica", "bold");
+    doc.text("Grand Total", 120, y);
+    doc.text(formatRupiah(grandTotal), pageWidth - 20, y, { align: "right" });
+
+    y += 20;
+    doc.text("Penjelasan", 20, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    const splitText = doc.splitTextToSize(penjelasan || "-", pageWidth - 40);
+    doc.text(splitText, 20, y);
+
+    doc.save(`${invoiceNumber}.pdf`);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="bg-[#0f172a] text-gray-100 min-h-screen p-4 md:p-10 font-sans">
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold text-white tracking-tight">Kaming Invoice</h1>
+          <p className="text-sm text-gray-400 mt-1">Simple & Fast Invoice Generator</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Input Form */}
+        <div className="bg-[#111827] border border-[#1e293b] p-6 space-y-6 rounded-xl shadow-xl">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">Kepada</label>
+              <input 
+                type="text" value={kepada} onChange={(e) => setKepada(e.target.value)} placeholder="Nama Klien"
+                className="w-full bg-[#0f172a] border border-[#1e293b] px-4 py-3 focus:border-blue-500 outline-none rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">Diberikan Oleh</label>
+              <input 
+                type="text" value={pemberi} onChange={(e) => setPemberi(e.target.value)}
+                className="w-full bg-[#0f172a] border border-[#1e293b] px-4 py-3 focus:border-blue-500 outline-none rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">Tanggal</label>
+              <input 
+                type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)}
+                className="w-full bg-[#0f172a] border border-[#1e293b] px-4 py-3 focus:border-blue-500 outline-none rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">Catatan</label>
+              <textarea 
+                value={penjelasan} onChange={(e) => setPenjelasan(e.target.value)}
+                className="w-full bg-[#0f172a] border border-[#1e293b] px-4 py-3 focus:border-blue-500 outline-none rounded-lg" rows={2}
+              ></textarea>
+            </div>
+          </div>
+
+          {/* Add Item Row */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-6 border-t border-[#1e293b]">
+            <input 
+              type="number" placeholder="Qty" value={inputQty} onChange={(e) => setInputQty(e.target.value === "" ? "" : Number(e.target.value))}
+              className="bg-[#0f172a] border border-[#1e293b] px-4 py-2 rounded-lg outline-none"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <input 
+              type="text" placeholder="Item" value={inputNama} onChange={(e) => setInputNama(e.target.value)}
+              className="bg-[#0f172a] border border-[#1e293b] px-4 py-2 rounded-lg outline-none"
+            />
+            <input 
+              type="number" placeholder="Harga" value={inputHarga} onChange={(e) => setInputHarga(e.target.value === "" ? "" : Number(e.target.value))}
+              className="bg-[#0f172a] border border-[#1e293b] px-4 py-2 rounded-lg outline-none"
+            />
+            <button onClick={addItem} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg transition-all">
+              Tambah
+            </button>
+          </div>
         </div>
-      </main>
-    </div>
+
+        {/* Table */}
+        <div className="mt-8 border border-[#1e293b] rounded-xl overflow-hidden bg-[#111827]">
+          <table className="w-full text-sm">
+            <thead className="bg-[#1e293b] text-gray-400 font-bold uppercase text-[10px]">
+              <tr>
+                <th className="p-4 text-left">Qty</th>
+                <th className="p-4 text-left">Deskripsi</th>
+                <th className="p-4 text-right">Harga</th>
+                <th className="p-4 text-right">Total</th>
+                <th className="p-4 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1e293b]">
+              {items.map((item, index) => (
+                <tr key={index}>
+                  <td className="p-4">{item.qty}</td>
+                  <td className="p-4 font-medium">{item.nama}</td>
+                  <td className="p-4 text-right">{formatRupiah(item.harga)}</td>
+                  <td className="p-4 text-right">{formatRupiah(item.total)}</td>
+                  <td className="p-4 text-center">
+                    <button onClick={() => removeItem(index)} className="text-red-500">Hapus</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-[#1e293b]/50 font-bold">
+              <tr>
+                <td colSpan={3} className="p-4 text-right">TOTAL</td>
+                <td className="p-4 text-right text-blue-500">{formatRupiah(grandTotal)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div className="mt-8 text-right">
+          <button 
+            onClick={downloadPDF} 
+            disabled={items.length === 0}
+            className={`px-8 py-4 rounded-xl font-bold shadow-lg transition-all ${
+              items.length === 0 ? 'bg-gray-700 text-gray-500' : 'bg-blue-600 hover:bg-blue-500 text-white'
+            }`}
+          >
+            Download PDF
+          </button>
+        </div>
+      </div>
+    </main>
   );
 }
