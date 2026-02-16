@@ -1,61 +1,39 @@
 // public/sw.js
+const CACHE_NAME = 'task-maker-v1';
 
-const CACHE_NAME = 'task-maker-cache-v1';
-
-// Daftar file minimal agar aplikasi bisa terbuka offline
-const ASSETS_TO_CACHE = [
-  '/',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png',
-  // Tambahkan path CSS atau JS utama jika kamu tahu namanya, 
-  // tapi Next.js biasanya menangani ini secara dinamis di bagian fetch.
-];
-
-// 1. Install: Simpan aset dasar
+// 1. Install & Cache file dasar
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
   self.skipWaiting();
 });
 
-// 2. Activate: Bersihkan cache lama
+// 2. Bersihkan cache lama
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
-        })
-      );
-    })
-  );
+  event.waitUntil(clients.claim());
 });
 
-// 3. Fetch: Strategi Offline (Stale-While-Revalidate)
+// 3. Strategi: Network First, then Cache (And Store to Cache)
 self.addEventListener('fetch', (event) => {
-  // Hanya proses permintaan GET
+  // Hanya proses request GET (halaman, gambar, js, css)
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.match(event.request).then((cachedResponse) => {
-        const fetchedResponse = fetch(event.request).then((networkResponse) => {
-          // Simpan salinan respon terbaru ke cache
-          cache.put(event.request, networkResponse.clone());
-          return networkResponse;
-        }).catch(() => {
-          // Jika offline total dan tidak ada di cache, bisa arahkan ke halaman offline khusus jika ada
+    fetch(event.request)
+      .then((response) => {
+        // Jika berhasil ambil dari internet, simpan salinannya ke cache
+        const resClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, resClone);
         });
-
-        // Kembalikan dari cache jika ada, jika tidak tunggu dari network
-        return cachedResponse || fetchedResponse;
-      });
-    })
+        return response;
+      })
+      .catch(() => {
+        // Jika internet mati/gagal, cari di cache
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Jika tidak ada di cache sama sekali, tampilkan error (opsional)
+        });
+      })
   );
 });
