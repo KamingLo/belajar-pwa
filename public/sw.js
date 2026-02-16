@@ -5,9 +5,9 @@ const CACHE_NAME = 'task-maker-cache-v1';
 // Daftar file minimal agar aplikasi bisa terbuka offline
 const ASSETS_TO_CACHE = [
   '/',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png',
+  '/manifest.webmanifest',
+  '/logo_pelita-192.png',
+  '/logo_pelita-192.png',
   // Tambahkan path CSS atau JS utama jika kamu tahu namanya, 
   // tapi Next.js biasanya menangani ini secara dinamis di bagian fetch.
 ];
