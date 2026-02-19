@@ -1,100 +1,100 @@
-import { createAuthToken } from "@/lib/auth-utils";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+"use client";
 
-// Data Dummy untuk testing
-const DUMMY_USERS = [
-  { id: "1", email: "admin@pwa.com", nama: "Admin Ganteng", password: "password123", role: "admin" },
-  { id: "2", email: "user@pwa.com", nama: "User Biasa", password: "password123", role: "student" },
-];
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  async function handleLogin(formData: FormData) {
-    "use server";
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
-    const email = formData.get("email");
-    const password = formData.get("password");
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
 
-    // 1. Cari user berdasarkan email
-    const user = DUMMY_USERS.find((u) => u.email === email);
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData);
 
-    // 2. Validasi sederhana (Cek user dan password)
-    if (!user || password !== "password123") {
-      // Pada aplikasi nyata, arahkan kembali dengan pesan error
-      return; 
-    }
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
 
-    // 3. Generate JWT Session (Gunakan AUTH_SECRET)
-    const token = await createAuthToken({
-      id: user.id,
-      nama: user.nama,
-      role: user.role,
-    });
+      const result = await res.json();
 
-    // 4. Simpan di HttpOnly Cookie
-    const cookieStore = await cookies();
-    cookieStore.set("auth_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24, // Berlaku 1 hari
-      path: "/",
-    });
+      if (!res.ok) throw new Error(result.message || "Gagal login");
 
-    // 5. Redirect Berdasarkan Role
-    if (user.role === "admin") {
-      redirect("/admin/scanner");
-    } else {
-      redirect("/student/profile");
+      // Redirect sukses
+      router.push(result.redirect);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+    <div className="flex min-h-screen items-center justify-center bg-slate-900 p-4">
+      <div className="w-full max-w-md bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">PWA Absensi</h1>
-          <p className="text-slate-500 mt-2">Masuk untuk melanjutkan</p>
+          <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto mb-4 flex items-center justify-center text-3xl shadow-lg shadow-blue-900/20">
+            📡
+          </div>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">PWA Absensi</h1>
+          <p className="text-slate-400 mt-2">Masuk ke sistem absensi modern</p>
         </div>
 
-        <form action={handleLogin} className="space-y-4">
+        {error && (
+          <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-sm rounded-xl text-center font-medium animate-shake">
+            ⚠️ {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-slate-400 uppercase ml-1">Email Address</label>
+            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Email Address</label>
             <input 
               name="email" 
               type="email" 
               required
-              placeholder="admin@pwa.com atau user@pwa.com" 
-              className="w-full p-3 mt-1 border border-slate-200 rounded-xl text-black focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+              disabled={loading}
+              placeholder="admin@pwa.com" 
+              className="w-full p-3 mt-1 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all disabled:opacity-50" 
             />
           </div>
           
           <div>
-            <label className="text-xs font-bold text-slate-400 uppercase ml-1">Password</label>
+            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Password</label>
             <input 
               name="password" 
               type="password" 
               required
-              placeholder="password123" 
-              className="w-full p-3 mt-1 border border-slate-200 rounded-xl text-black focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+              disabled={loading}
+              placeholder="••••••••" 
+              className="w-full p-3 mt-1 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all disabled:opacity-50" 
             />
           </div>
 
           <button 
             type="submit" 
-            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 mt-4"
+            disabled={loading}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/40 transition-all active:scale-95 mt-4 disabled:bg-blue-800 disabled:cursor-not-allowed"
           >
-            Sign In
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Processing...
+              </span>
+            ) : "Sign In Now"}
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-50 text-center">
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Akses Cepat Testing</p>
-          <div className="mt-2 text-[11px] text-slate-500 bg-slate-50 p-3 rounded-lg">
-            Admin: admin@pwa.com <br/>
-            Student: user@pwa.com <br/>
-            Pass: password123
-          </div>
+        <div className="mt-8 pt-6 border-t border-slate-700/50 text-center text-[11px] text-slate-500">
+           Sistem Absensi v2.0 &bull; 2026
         </div>
       </div>
     </div>

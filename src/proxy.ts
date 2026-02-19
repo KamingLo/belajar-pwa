@@ -1,4 +1,3 @@
-// proxy.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
@@ -6,60 +5,73 @@ import { jwtVerify } from 'jose';
 const SECRET_KEY = process.env.JWT_SECRET || "rahasia-super-aman-123";
 const SECRET = new TextEncoder().encode(SECRET_KEY);
 
-export default async function proxy(request: NextRequest) {
+// 1. Mapping Role ke Default Dashboard & Allowed Prefix
+const ROLE_CONFIG: Record<string, { dashboard: string; prefix: string }> = {
+  admin: {
+    dashboard: '/admin',
+    prefix: '/admin'
+  },
+  student: {
+    dashboard: '/student',
+    prefix: '/student'
+  },
+};
+
+export default async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
   const { pathname } = request.nextUrl;
 
-  // 1. BYPASS ASET STATIS & API (Mencegah loop pada file sistem)
-  if (
-    pathname.startsWith('/_next') || 
-    pathname.startsWith('/api') ||
-    pathname.includes('.')
-  ) {
-    return NextResponse.next();
-  }
-
-  // 2. LOGIKA BELUM LOGIN
+  // 2. Logic Belum Login
   if (!token) {
     if (pathname === '/login') return NextResponse.next();
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // 3. LOGIKA SUDAH LOGIN
   try {
     const { payload } = await jwtVerify(token, SECRET);
-    // Pastikan role sesuai dengan data dummy di login/page.tsx
-    const role = payload.role as string; 
+    const role = payload.role as string;
+    const config = ROLE_CONFIG[role];
 
-    // Jika user berada di /login padahal sudah login, arahkan ke dashboard yang benar
+    // Jika token valid tapi role tidak dikenali (keamanan tambahan)
+    if (!config) {
+      const response = NextResponse.redirect(new URL('/login', request.url));
+      response.cookies.delete('auth_token');
+      return response;
+    }
+
+    // 3. Logic Redirect Login (Jika sudah login tapi akses /login)
     if (pathname === '/login') {
-      const target = role === 'admin' ? '/admin/scanner' : '/student/profile';
-      return NextResponse.redirect(new URL(target, request.url));
+      return NextResponse.redirect(new URL(config.dashboard, request.url));
     }
 
-    // --- PROTEKSI ROLE (CEK DISINI) ---
+    // 4. PROTEKSI RUTE (Modern & Dynamic)
     
-    // Jika mencoba akses /admin tapi bukan admin, lempar ke student profile
-    if (pathname.startsWith('/admin') && role !== 'admin') {
-      return NextResponse.redirect(new URL('/student/profile', request.url));
+    // Cek apakah user mencoba akses rute role lain
+    // Contoh: Admin mencoba akses /student atau sebaliknya
+    const isAccessingOtherRole = Object.values(ROLE_CONFIG).some(
+      (other) => pathname.startsWith(other.prefix) && other.prefix !== config.prefix
+    );
+
+    // Cek apakah user berada di root "/" atau rute yang tidak sesuai prefix-nya
+    const isNotOnCorrectPrefix = !pathname.startsWith(config.prefix);
+
+    if (isAccessingOtherRole || isNotOnCorrectPrefix) {
+      return NextResponse.redirect(new URL(config.dashboard, request.url));
     }
 
-    // Jika mencoba akses /student tapi dia adalah admin, lempar ke admin scanner
-    if (pathname.startsWith('/student') && role === 'admin') {
-      return NextResponse.redirect(new URL('/admin/scanner', request.url));
-    }
-
-    // Jika sudah di rute yang benar atau rute umum lainnya, izinkan lewat
     return NextResponse.next();
 
   } catch (e) {
-    // Jika token expired atau dimodifikasi, hapus cookie dan paksa login ulang
+    // Token expired atau invalid
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('auth_token');
     return response;
   }
 }
 
+// Matcher yang lebih bersih (exclude public files)
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|sw.js).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.png$).*)',
+  ],
 };
