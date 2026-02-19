@@ -42,9 +42,7 @@ export default function RootLayout({
           {/* Konten Utama (Mengambil sisa ruang) */}
           <main className="flex-1 relative overflow-y-auto">
             {/* Beri pt-16 hanya di mobile agar tidak tertutup header hamburger */}
-            <div className="pt-16 lg:pt-0">
               {children}
-            </div>
           </main>
           
         </div>
