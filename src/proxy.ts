@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const SECRET_KEY = process.env.JWT_SECRET || "rahasia-super-aman-123";
+const SECRET_KEY = process.env.JWT_SECRET || "fallback-login-secret-32-chars-min";
 const SECRET = new TextEncoder().encode(SECRET_KEY);
 
 // 1. Mapping Role ke Default Dashboard & Allowed Prefix
